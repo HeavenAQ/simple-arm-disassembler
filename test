@@ -1,0 +1,14 @@
+PC	condition	instruction
+0	AL		ADD
+4	AL		MOV
+8	AL		ADD
+12	LE		CMP
+16	LE		B	8
+20	AL		LDR
+24	GT		STR	
+
+	
+	
+
+    
+    
