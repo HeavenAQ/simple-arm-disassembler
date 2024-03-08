@@ -109,7 +109,6 @@ print_digit:
     mov r8, #0 @ reset counter
     b get_digit 
 
-
 itoa_handle_zero:
     mov r8, #48
     strb r8, [r4], #1
@@ -124,6 +123,7 @@ end_itoa:
 
 @ main program
 @ registers
+@ r3 = PC counter
 @ r10 = start of the included file
 @ r11 = end of the included file
 @ r12 = current instruction
@@ -204,13 +204,64 @@ print_condition:
 
 print_instruction:
     and r5, r12, #0x0fffffff
-    lsr r5, r5, #26
-    cmp r5, #0
-    beq handle_data_processing
+    and r6, r12, #0x000000f0
+    lsr r4, r5, #25 @ 3 bits
+    lsr r5, r5, #26 @ 2 bits
+
+    @ data transfer
     cmp r5, #1
     beq handle_data_transfer
-    cmp r5, #2
+
+    @ out-of-scope instruction
+    cmp r4, #4
+    beq handle_other
+    
+    @ branch instruction
+    cmp r4, #5
     beq handle_branch
+
+    @ bx instruction
+    and r9, r12, #0x0ffffff0
+    lsr r8, r9, #20
+    cmp r8, #0x00000012
+    andeq r9, r12, #0x00000ff0
+    lsreq r8, r9, #8
+    cmpeq r8, #0x0000000f
+    andeq r9, r12, #0x000000f0
+    lsreq r8, r9, #4
+    cmpeq r8, #1
+    beq handle_bx
+
+    @ multiply instruction
+    cmp r4, #0
+    cmpeq r6, #0x00000090
+    beq handle_multiply
+
+
+    @ out-of-scope instruction
+    cmp r4, #0
+    cmpeq r6, #0x00000090
+    beq handle_other 
+
+    cmp r4, #0
+    cmpeq r6, #0x00000010
+    beq handle_other
+
+    cmp r4, #0
+    cmpeq r6, #0x000000d0
+    beq handle_other
+
+    cmp r4, #0
+    cmpeq r6, #0x000000b0
+    beq handle_other
+
+    @ data processing instruction
+    cmp r5, #0
+    cmpeq r6, #0x000000f0
+    beq handle_other
+    bne handle_data_processing
+
+    b handle_other
 
 handle_data_processing:
     lsl r5, r12, #7
@@ -249,6 +300,15 @@ handle_data_processing:
     printeq mvn_txt, #5
     b read_loop 
 
+handle_multiply:
+    and r5, r12, #0x00200000
+    lsr r5, r5, #21
+    cmp r5, #0
+    printeq mul_txt, #5
+    cmp r5, #1
+    printeq mla_txt, #5
+    b read_loop
+
 handle_data_transfer:
     and r5, r12, #0x00100000
     lsr r5, r5, #20
@@ -258,28 +318,44 @@ handle_data_transfer:
     printeq ldr_txt, #5
     b read_loop 
 
-
 handle_branch:
-    print b_txt, #2
+    @ print instruction
+    and r5, r12, #0x01000000
+    lsr r5, r5, #24
+    cmp r5, #0
+    printeq b_txt, #3
+    cmp r5, #1
+    printeq bl_txt, #4
+
+    @ get the offset
     and r5, r12, #0x00ffffff
     lsl r5, r5, #2
 
     @ if the branch is negative, add 0xff000000
     tst r5, #0x00800000
-    bne resolve_neg
+    bne handle_neg_offset 
     b print_offset
 
-resolve_neg:
+handle_neg_offset:
     orr r5, r5, #0xff000000
     b print_offset
 
 print_offset:
+    @ add the offset to the PC
     add r0, r5, #8
     add r0, r0, r3
     ldr r1, =pc_count
     bl itoa
     print pc_count, #11
     print linefeed, #1
+    b read_loop
+
+handle_other:
+    print und_txt, #4
+    b read_loop
+
+handle_bx:
+    print bx_txt, #3
     b read_loop
 
 end_read_loop:
@@ -328,6 +404,8 @@ orr_txt: .asciz "ORR\n"
 mov_txt: .asciz "MOV\n"
 bic_txt: .asciz "BIC\n"
 mvn_txt: .asciz "MVN\n"
+mul_txt: .asciz "MUL\n"
+mla_txt: .asciz "MLA\n"
 
 @ data transfer instructions
 ldr_txt: .asciz "LDR\n"
@@ -335,3 +413,8 @@ str_txt: .asciz "STR\n"
 
 @ branch
 b_txt: .asciz "B\t"
+bl_txt: .asciz "BL\t"
+bx_txt: .asciz "BX\n"
+
+@ other
+und_txt: .asciz "UND\n"

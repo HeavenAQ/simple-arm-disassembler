@@ -5,9 +5,3 @@ L1:	add r1, r1, #1
 	ble L1
 	ldr r3, [r1, #10]
 	str r5, [r2], #6
-	
-	
-	
-
-    
-    

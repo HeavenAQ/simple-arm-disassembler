@@ -6,9 +6,3 @@ PC	condition	instruction
 16	LE		B	8
 20	AL		LDR
 24	GT		STR	
-
-	
-	
-
-    
-    
